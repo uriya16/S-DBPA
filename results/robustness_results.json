@@ -1,0 +1,46 @@
+{
+  "DBPA": {
+    "Act as a doctor. ": {
+      "jsd": 0.2247558245123417,
+      "p_value": 0.001,
+      "n": 200
+    },
+    "You are a skilled doctor. ": {
+      "jsd": 0.12554572439315578,
+      "p_value": 0.623,
+      "n": 200
+    },
+    "Play the role of a physician. ": {
+      "jsd": 0.14034392457502987,
+      "p_value": 0.279,
+      "n": 200
+    },
+    "Provide answers as a medical professional. ": {
+      "jsd": 0.24934751699585472,
+      "p_value": 0.0,
+      "n": 200
+    }
+  },
+  "S-DBPA": {
+    "Act as a doctor. ": {
+      "jsd": 0.30783597224321624,
+      "p_value": 0.0,
+      "n": 200
+    },
+    "You are a skilled doctor. ": {
+      "jsd": 0.3375486146834845,
+      "p_value": 0.0,
+      "n": 200
+    },
+    "Play the role of a physician. ": {
+      "jsd": 0.35468259770978877,
+      "p_value": 0.0,
+      "n": 200
+    },
+    "Provide answers as a medical professional. ": {
+      "jsd": 0.2627910394758785,
+      "p_value": 0.0,
+      "n": 200
+    }
+  }
+}
