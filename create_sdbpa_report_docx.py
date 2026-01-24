@@ -3,13 +3,17 @@ import os
 from docx import Document
 from docx.shared import Inches, Pt, RGBColor
 from docx.enum.text import WD_ALIGN_PARAGRAPH
+from docx.oxml import parse_xml
+from docx.oxml.ns import nsdecls
 from docx.oxml.ns import qn
+import formulas_omml
 
 # Input/Output paths
 RESULTS_FILE = "results/robustness_results.json"
 PLOT_FILE = "results/robustness_comparison.png"
 JSD_PLOT_FILE = "results/jsd_comparison.png"
-DOCX_FILE = "results/S-DBPA_Final_Report_v2.docx"
+# Use a new filename to avoid lock issues
+DOCX_FILE = "results/S-DBPA_Final_Report_v3.docx"
 
 def set_font(run, font_name='Times New Roman', font_size=12, bold=False, italic=False):
     run.font.name = font_name
@@ -30,6 +34,12 @@ def add_paragraph(doc, text, align=WD_ALIGN_PARAGRAPH.JUSTIFY):
     p.alignment = align
     run = p.add_run(text)
     set_font(run)
+    return p
+
+def add_omml_equation(doc, omml_string):
+    """Inserts a native Word equation using OMML XML."""
+    p = doc.add_paragraph()
+    p._element.append(parse_xml(omml_string))
     return p
 
 def main():
@@ -77,12 +87,34 @@ def main():
         "A prompt P (\"Act as a doctor\") and its semantic equivalent P' (\"You are a doctor\") often yield "
         "statistically distinguishable response distributions under standard testing, leading to inconsistent auditing conclusions."
     )
-    add_paragraph(doc,
-        "We propose S-DBPA, which redefines the unit of analysis from a single prompt to a \"Semantic Neighborhood\". "
-        "By integrating a Controlled Semantic Sampling step — generating a distribution of synonymous prompts via a "
-        "paraphrasing model and filtering via an embedding model — we construct a robust test "
-        "statistic that is invariant to trivial wording changes."
+    
+    # Text with inline formula placeholder logic (manual splitting for clarity)
+    p_intro = doc.add_paragraph()
+    p_intro.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
+    run1 = p_intro.add_run("We propose ")
+    set_font(run1)
+    run2 = p_intro.add_run("S-DBPA")
+    set_font(run2, bold=True)
+    run3 = p_intro.add_run(
+        ", which redefines the unit of analysis from a single prompt to a \"Semantic Neighborhood\". "
+        "By integrating a Controlled Semantic Sampling step — generating a distribution of synonymous prompts "
     )
+    set_font(run3)
+    # Inline math P_sem
+    run_math = p_intro.add_run("P_sem") 
+    set_font(run_math, italic=True) 
+    run4 = p_intro.add_run(
+        " via a paraphrasing model "
+    )
+    set_font(run4)
+    run_phi = p_intro.add_run("phi")
+    set_font(run_phi, italic=True)
+    run5 = p_intro.add_run(" and filtering via an embedding model ")
+    set_font(run5)
+    run_psi = p_intro.add_run("psi")
+    set_font(run_psi, italic=True)
+    run6 = p_intro.add_run(" — we construct a robust test statistic that is invariant to trivial wording changes.")
+    set_font(run6)
 
     # --- 2. Methodology ---
     doc.add_heading('2. Controlled Semantic Sampling: The 4-Step S-DBPA Methodology', level=1)
@@ -90,75 +122,103 @@ def main():
         "S-DBPA introduces a rigorous 4-step process to ensure auditing robustness. This structure was designed to isolate semantic intent from lexical variation:"
     )
     
-    # List items
-    items = [
-        ("Step 1: Semantic Neighborhood Generation (P_raw)", "We first explore the \"semantic manifold\" of the base prompt by generating a large set of candidate variations using a paraphrasing LLM. Rationale: A single prompt is just one point in intent-space. To audit the concept, we must cover the local area."),
-        ("Step 2: Semantic Filtering (P_sem)", "We apply a strict cosine similarity filter (tau=0.50) using an embedding model to retain only high-quality paraphrases. Rationale: Generative models can hallucinate or drift. Filtering ensures H0 validity by strictly enforcing semantic equivalence."),
-        ("Step 3: Response Sampling", "We sample responses from the subject model using the filtered set of prompts. Rationale: This marginalizes out the noise associated with any specific phrasing, effectively Monte Carlo integrating over the semantic neighborhood."),
-        ("Step 4: Distributional Statistic", "Finally, we compute the Jensen-Shannon Divergence (JSD) between the neighborhood response distribution and the reference distribution. Rationale: JSD is a symmetric, smoothed metric ideal for comparing high-dimensional embedding distributions.")
-    ]
-    
-    for title, desc in items:
-        p = doc.add_paragraph(style='List Number')
-        run = p.add_run(title + "\n")
-        set_font(run, bold=True)
-        run2 = p.add_run(desc)
-        set_font(run2)
+    # List items with simple formatting for inline math
+    step1 = doc.add_paragraph(style='List Number')
+    set_font(step1.add_run("Step 1: Semantic Neighborhood Generation (P_raw)\n"), bold=True)
+    set_font(step1.add_run("We first explore the \"semantic manifold\" of the base prompt by generating a large set of candidate variations using a paraphrasing LLM. "))
+    set_font(step1.add_run("Rationale: "), italic=True)
+    set_font(step1.add_run("A single prompt is just one point in intent-space. To audit the concept, we must cover the local area."))
 
-    # Formal Sampling Stage (Math Block)
-    add_paragraph(doc, "Let f_theta be the LLM under audit. Let p be a base prompt. S-DBPA formalized this sampling stage as follows:")
-    
-    math_text = (
-        "1.  P_raw = {p'_1, ..., p'_N} ~ Generator(p)\n"
-        "2.  P_sem = {x in P_raw | cos(psi(x), psi(p)) > tau}\n"
-        "3.  For all p'_i in P_sem, r'_i ~ f_theta(p'_i)\n"
-        "4.  Statistic: T({r'_i}, R_ref)"
-    )
-    p_math = doc.add_paragraph(math_text)
-    p_math.style = 'Quote' # Use Quote style for block display
-    set_font(p_math.runs[0], font_name='Courier New', font_size=10)
+    step2 = doc.add_paragraph(style='List Number')
+    set_font(step2.add_run("Step 2: Semantic Filtering (P_sem)\n"), bold=True)
+    set_font(step2.add_run("We apply a strict cosine similarity filter (tau=0.50) using an embedding model to retain only high-quality paraphrases. "))
+    set_font(step2.add_run("Rationale: "), italic=True)
+    set_font(step2.add_run("Generative models can hallucinate or drift. Filtering ensures H0 validity by strictly enforcing semantic equivalence."))
+
+    step3 = doc.add_paragraph(style='List Number')
+    set_font(step3.add_run("Step 3: Response Sampling\n"), bold=True)
+    set_font(step3.add_run("We sample responses from the subject model using the filtered set of prompts. "))
+    set_font(step3.add_run("Rationale: "), italic=True)
+    set_font(step3.add_run("This marginalizes out the noise associated with any specific phrasing, effectively Monte Carlo integrating over the semantic neighborhood."))
+
+    step4 = doc.add_paragraph(style='List Number')
+    set_font(step4.add_run("Step 4: Distributional Statistic\n"), bold=True)
+    set_font(step4.add_run("Finally, we compute the Jensen-Shannon Divergence (JSD) between the neighborhood response distribution and the reference distribution. "))
+    set_font(step4.add_run("Rationale: "), italic=True)
+    set_font(step4.add_run("JSD is a symmetric, smoothed metric ideal for comparing high-dimensional embedding distributions."))
+
+    # Sampling Stage Intro
+    p_formal = doc.add_paragraph()
+    set_font(p_formal.add_run("Let "))
+    set_font(p_formal.add_run("f_theta"), italic=True)
+    set_font(p_formal.add_run(" be the LLM under audit. Let "))
+    set_font(p_formal.add_run("p"), italic=True)
+    set_font(p_formal.add_run(" be a base prompt. S-DBPA formalized this sampling stage as follows:"))
+
+    # --- BLOCK EQUATION 1: Sampling Steps ---
+    add_omml_equation(doc, formulas_omml.SAMPLING_STEPS_OMML)
 
     # --- 2.1 Proof of Exchangeability ---
     doc.add_heading('2.1 Proof of Exchangeability Under Null Hypothesis', level=2)
     add_paragraph(doc, 
-        "To establish the validity of the permutation test used in S-DBPA, we must prove that under the null hypothesis H0 "
-        "(that the persona has no effect), the responses from the semantic neighborhood are exchangeable with the reference responses."
+        "To establish the validity of the permutation test used in S-DBPA, we must prove that under the null hypothesis, "
+        "the responses from the semantic neighborhood are exchangeable with the reference responses."
     )
     
+    # Theorem 1 (Mixed Text and Inline Math)
     p_thm = doc.add_paragraph()
     run_thm = p_thm.add_run("Theorem 1 (Semantic Exchangeability): ")
     set_font(run_thm, bold=True)
-    run_thm_text = p_thm.add_run(
-        "Let S be a set of semantically equivalent prompts such that for any p_a, p_b in S, the conditional distribution of responses P(r|p_a) = P(r|p_b) under H0. "
-        "Then the joint distribution of responses generated from S is invariant under permutation with the reference set R_ref."
-    )
-    set_font(run_thm_text, italic=True)
+    
+    runs = [
+        "Let ", formulas_omml.THEOREM_1_OMML[0], " be a set of semantically equivalent prompts such that for any ",
+        formulas_omml.THEOREM_1_OMML[1], ", the conditional distribution of responses ",
+        formulas_omml.THEOREM_1_OMML[2], " under ", formulas_omml.THEOREM_1_OMML[3], ". ",
+        "Then the joint distribution of responses generated from ", formulas_omml.THEOREM_1_OMML[0], 
+        " is invariant under permutation with the reference set ", formulas_omml.THEOREM_1_OMML[4], "."
+    ]
+    
+    for item in runs:
+        if item.startswith("<m:oMath"):
+            p_thm._element.append(parse_xml(item))
+        else:
+            set_font(p_thm.add_run(item), italic=True)
 
+    # Proof (Mixed Text and Inline Math)
     p_proof = doc.add_paragraph()
     run_proof = p_proof.add_run("Proof: ")
     set_font(run_proof, bold=True)
-    run_proof_text = p_proof.add_run(
-        "Assume H0 implies that the persona instructions in S are ignored or irrelevant to the task features. "
-        "The prompt can be decomposed into x_task + x_persona. Under H0, f_theta(r|x_task, x_persona) = f_theta(r|x_task). "
-        "Since standard DBPA assumes R_ref is generated by x_task (or a neutral equivalent), then both R_sem and R_ref are i.i.d. samples from f_theta(.|x_task). "
-        "Therefore, the sequence of random variables (R_sem, R_ref) is exchangeable. Consequently, the permutation p-value is exact. Q.E.D."
-    )
-    set_font(run_proof_text)
+    
+    proof_runs = [
+        "Assume ", formulas_omml.PROOF_OMML[0], " implies that the persona instructions in ", formulas_omml.PROOF_OMML[1], 
+        " are ignored or irrelevant to the task features. The prompt can be decomposed into ", formulas_omml.PROOF_OMML[2], 
+        ". Under ", formulas_omml.PROOF_OMML[0], ", ", formulas_omml.PROOF_OMML[3], ". ",
+        "Since standard DBPA assumes ", formulas_omml.PROOF_OMML[4], " is generated by ", formulas_omml.PROOF_OMML[5], 
+        " (or a neutral equivalent), then both ", formulas_omml.PROOF_OMML[6], " and ", formulas_omml.PROOF_OMML[4], 
+        " are i.i.d. samples from ", formulas_omml.PROOF_OMML[7], ". ",
+        "Therefore, the sequence of random variables (", formulas_omml.PROOF_OMML[6], ", ", formulas_omml.PROOF_OMML[4], 
+        ") is exchangeable. Consequently, the permutation p-value is exact. Q.E.D."
+    ]
+    
+    for item in proof_runs:
+        if item.startswith("<m:oMath"):
+            p_proof._element.append(parse_xml(item))
+        else:
+            set_font(p_proof.add_run(item))
 
     # --- 2.2 Theoretical Justification ---
     doc.add_heading('2.2 Theoretical Justification for Robustness', level=2)
     add_paragraph(doc,
-        "Standard DBPA estimates an effect size omega_p = E[D(r_p, r_ref)]. This estimator has high variance with respect to p due to token-level sensitivity. "
+        "Standard DBPA estimates an effect size using the expectation of the distance metric. "
+        "This estimator has high variance due to token-level sensitivity. "
         "S-DBPA estimates the expected effect over the semantic manifold:"
     )
     
-    # Equation approximation
-    p_eq = doc.add_paragraph("omega_S = E_{p ~ S} [ E[D(r_p, r_ref)] ]")
-    p_eq.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    set_font(p_eq.runs[0], font_name='Courier New', font_size=11)
+    # --- BLOCK EQUATION 2: Robustness Formula ---
+    add_omml_equation(doc, formulas_omml.ROBUSTNESS_OMML)
 
     add_paragraph(doc,
-        "By the Law of Large Numbers, as |S| -> infinity, the variance of omega_S decreases, providing a stable audit metric."
+        "By the Law of Large Numbers, as the size of the semantic set increases, the variance of this estimator decreases, providing a stable audit metric."
     )
 
     # --- 2.3 Experimental Setup ---
@@ -179,6 +239,9 @@ def main():
 
     p_note = doc.add_paragraph("Note on Models: While the original DBPA framework utilized text-embedding-ada-002 for output distance measurements, we employed all-MiniLM-L6-v2 for both the semantic filtering and output embedding stages. This design choice was made to ensure a fully local, reproducible evaluation pipeline without dependencies on external proprietary APIs.")
     set_font(p_note.runs[0], italic=True, font_size=10)
+    
+    # Add border/shading rough approx (not perfect in docx easily without more oxml)
+    # Skipping generic border to keep it simple, italics/small font distinguishes it.
 
     # --- 3. Results ---
     doc.add_heading('3. Experimental Results', level=1)
